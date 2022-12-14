@@ -6,6 +6,7 @@ from sacred import Experiment
 from sacred.commands import print_config
 from sacred.observers import FileStorageObserver
 import torch
+from torch import nn
 from torch.nn.utils import clip_grad_norm_
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
@@ -30,24 +31,24 @@ def cycle(iterable):
 def config():
     # Model params
     init_features = 2
-    
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logdir = f'runs/baseline_unet{init_features}-' + datetime.now(
     ).strftime('%y%m%d-%H%M%S')
 
     # Batch-size
-    batch_size = 128
+    batch_size = 64
     path = "./metadata.json"
 
     # Epoch information
-    iterations = 500
+    iterations = 100
     resume_iteration = None
     checkpoint_interval = None
-    validation_interval = 50
-    learning_rate_decay_steps = 50
+    validation_interval = 100
+    learning_rate_decay_steps = 100
     learning_rate_decay_rate = 0.98
 
-    learning_rate = 1e-4
+    learning_rate = 1e-3
     clip_gradient_norm = 3
     ex.observers.append(FileStorageObserver.create(logdir))
 
@@ -128,6 +129,11 @@ def train(
     assert isinstance(scheduler, StepLR), ""
     assert isinstance(dice_loss, DiceLoss), ""
 
+    # NOTE: multiple GPU
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        model = nn.DataParallel(model)
+
     # NOTE: Start train
     loop = tqdm(range(resume_iteration + 1, iterations + 1), desc="Epoch...")
     model.train()
@@ -162,3 +168,12 @@ def train(
                 writer.add_scalar('test/loss', np.mean(_loss), global_step=i)
                 pass
             model.train()
+            pass
+        pass
+
+    # NOTE: Save model
+    print(f"Save model for inference")
+    if isinstance(model, nn.DataParallel):
+        model = model.module
+
+    torch.save(model, os.path.join(logdir, f"model.pt"))
