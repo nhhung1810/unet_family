@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from typing import Tuple
 import numpy as np
 from sacred import Experiment
 from sacred.commands import print_config
@@ -27,60 +28,58 @@ def cycle(iterable):
 
 @ex.config
 def config():
-    logdir = 'runs/baseline_unet-' + datetime.now().strftime('%y%m%d-%H%M%S')
+    # Model params
+    init_features = 2
+    
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logdir = f'runs/baseline_unet{init_features}-' + datetime.now(
+    ).strftime('%y%m%d-%H%M%S')
 
     # Batch-size
-    batch_size = 2
+    batch_size = 128
     path = "./metadata.json"
 
     # Epoch information
-    iterations = 100
+    iterations = 500
     resume_iteration = None
-    checkpoint_interval = 10
-    validation_interval = 10
-    learning_rate_decay_steps = 10
+    checkpoint_interval = None
+    validation_interval = 50
+    learning_rate_decay_steps = 50
     learning_rate_decay_rate = 0.98
 
-    learning_rate = 0.0006
+    learning_rate = 1e-4
     clip_gradient_norm = 3
     ex.observers.append(FileStorageObserver.create(logdir))
 
 
-@ex.automain
-def train(
-    logdir,
-    device,
-    iterations,
-    resume_iteration,
-    checkpoint_interval,
-    path,
-    batch_size,
-    learning_rate,
-    learning_rate_decay_steps,
-    learning_rate_decay_rate,
-    clip_gradient_norm,
-    validation_interval,
-):
-    print_config(ex.current_run)
+@ex.capture
+def make_dataloader(path, batch_size):
+    train_dataset = ButterFly(metadata_path=path, group='train')
 
-    os.makedirs(logdir, exist_ok=True)
-    writer = SummaryWriter(logdir)
-
-    train_groups, validation_groups = 'train', 'test'
-
-    train_dataset = ButterFly(metadata_path=path, group=train_groups)
-
-    # val_dataset = ButterFly(metadata_path=path, group=train_groups)
+    val_dataset = ButterFly(metadata_path=path, group='test')
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, drop_last=True
     )
-    # val_loader = DataLoader(
-    #     val_dataset, batch_size=batch_size, shuffle=True, drop_last=True
-    # )
 
-    model = UNet(init_features=2)
+    val_loader = DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=True, drop_last=True
+    )
+
+    return train_loader, val_loader
+
+
+@ex.capture
+def make_model(
+    logdir,
+    device,
+    resume_iteration,
+    learning_rate,
+    learning_rate_decay_steps,
+    learning_rate_decay_rate,
+    init_features
+) -> Tuple[int, UNet, torch.optim.Adam, StepLR, DiceLoss]:
+    model = UNet(init_features=init_features)
     model.to(device)
 
     if resume_iteration is None:
@@ -99,8 +98,39 @@ def train(
         gamma=learning_rate_decay_rate
     )
     dice_loss = DiceLoss()
+    return resume_iteration, model, optimizer, scheduler, dice_loss
 
+
+@ex.automain
+def train(
+    logdir,
+    device,
+    iterations,
+    resume_iteration,
+    checkpoint_interval,
+    clip_gradient_norm,
+    validation_interval,
+):
+    print_config(ex.current_run)
+
+    os.makedirs(logdir, exist_ok=True)
+    writer = SummaryWriter(logdir)
+
+    # NOTE: Init core component
+    train_loader, val_loader = make_dataloader()
+    resume_iteration, model, optimizer, scheduler, dice_loss = make_model()
+
+    # NOTE: Code suggestion enforce
+    assert isinstance(train_loader, DataLoader), ""
+    assert isinstance(val_loader, DataLoader), ""
+    assert isinstance(model, UNet), ""
+    assert isinstance(optimizer, torch.optim.Adam), ""
+    assert isinstance(scheduler, StepLR), ""
+    assert isinstance(dice_loss, DiceLoss), ""
+
+    # NOTE: Start train
     loop = tqdm(range(resume_iteration + 1, iterations + 1), desc="Epoch...")
+    model.train()
     for i, batch in zip(loop, cycle(train_loader)):
         imag = batch['image'].to(device)
         label = batch['mask'].to(device)
@@ -118,25 +148,17 @@ def train(
 
         writer.add_scalar('train/loss', loss.item(), global_step=i)
 
-        # if i % validation_interval == 0:
-        #     model.eval()
-        #     with torch.no_grad():
-        #         for key, value in evaluate(validation_dataset, model).items():
-        #             writer.add_scalar(
-        #                 'validation/' + key.replace(' ', '_'),
-        #                 np.mean(value),
-        #                 global_step=i
-        #             )
-        #     model.train()
-
-        # if i % checkpoint_interval == 0:
-        #     # torch.save(model, os.path.join(logdir, f'model-{i}.pt'))
-        #     model.to("cpu")
-        #     torch.save(
-        #         model.state_dict(), os.path.join(logdir, f'model-{i}.pt')
-        #     )
-        #     model.to(device)
-        #     torch.save(
-        #         optimizer.state_dict(),
-        #         os.path.join(logdir, 'last-optimizer-state.pt')
-        #     )
+        if i % validation_interval == 0:
+            model.eval()
+            with torch.no_grad():
+                _loss = []
+                for val_batch in val_loader:
+                    imag = val_batch['image'].to(device)
+                    label = val_batch['mask'].to(device)
+                    pred = model(imag)
+                    loss = dice_loss.forward(pred, label)
+                    _loss.append(loss.item())
+                    pass
+                writer.add_scalar('test/loss', np.mean(_loss), global_step=i)
+                pass
+            model.train()
