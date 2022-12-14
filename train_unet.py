@@ -100,6 +100,7 @@ def make_model(
         gamma=learning_rate_decay_rate
     )
     dice_loss = DiceLoss()
+    dice_loss.to(device)
     return resume_iteration, model, optimizer, scheduler, dice_loss
 
 
@@ -166,7 +167,7 @@ def train(
                     imag = val_batch['image'].to(device)
                     label = val_batch['mask'].to(device)
                     pred = model(imag)
-                    loss = dice_loss.forward(pred, label)
+                    loss = dice_loss.forward(pred, label).to('cpu')
                     _loss.append(loss.item())
                     pass
                 writer.add_scalar('test/loss', np.mean(_loss), global_step=i)
