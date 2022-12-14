@@ -38,14 +38,15 @@ def config():
 
     # Batch-size
     batch_size = 64
+    gradient_acc_step = 4
     path = "./metadata.json"
 
     # Epoch information
-    iterations = 100
+    iterations = 100 * gradient_acc_step
     resume_iteration = None
     checkpoint_interval = None
-    validation_interval = 100
-    learning_rate_decay_steps = 100
+    validation_interval = 100 * gradient_acc_step
+    learning_rate_decay_steps = 100 * gradient_acc_step
     learning_rate_decay_rate = 0.98
 
     learning_rate = 1e-3
@@ -111,6 +112,7 @@ def train(
     checkpoint_interval,
     clip_gradient_norm,
     validation_interval,
+    gradient_acc_step
 ):
     print_config(ex.current_run)
 
@@ -142,12 +144,14 @@ def train(
         label = batch['mask'].to(device)
 
         pred = model(imag)
-        loss = dice_loss.forward(pred, label)
-
         optimizer.zero_grad()
+
+        loss = dice_loss.forward(pred, label)
         loss.backward()
-        optimizer.step()
-        scheduler.step()
+
+        if (i % gradient_acc_step == 0):
+            optimizer.step()
+            scheduler.step()
 
         if clip_gradient_norm:
             clip_grad_norm_(model.parameters(), clip_gradient_norm)
@@ -166,7 +170,6 @@ def train(
                     _loss.append(loss.item())
                     pass
                 writer.add_scalar('test/loss', np.mean(_loss), global_step=i)
-                pass
             model.train()
             pass
         pass
