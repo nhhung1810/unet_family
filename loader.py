@@ -86,7 +86,7 @@ class ButterFly(Dataset):
             imag = read_image(image_path)
             mask = read_image(mask_path)
             imag = F.resize(imag, (256, 256)).float() / 255.0
-            mask = F.resize(imag, (256, 256)).float()
+            mask = F.resize(mask, (256, 256)).float()
             mask = torch.mean(mask, dim=0, keepdim=True)
             mask[mask > 0.] = 1.
             mask[mask == 0.] = 0.

@@ -1,5 +1,6 @@
 data/
 runs/
+model_store/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
