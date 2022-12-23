@@ -17,7 +17,7 @@ from loader import ButterFly
 
 # Internal functions
 from nnet import UNet, summary
-from aug_loader import AugButterFly
+from aug_loader import AugButterFly, CachedAugButterfly
 from loss import DiceLoss
 
 ex = Experiment('augmentation_unet')
@@ -38,9 +38,11 @@ def config():
     logdir = f'runs/augment_unet{init_features}-' + datetime.now().strftime('%y%m%d-%H%M%S')
 
     # Batch-size
-    batch_size = 64
+    batch_size = 32
     gradient_acc_step = 4
     path = "./metadata.json"
+    train_aug_path = "./data/augment_leedsbutterfly/train/metadata.json"
+    test_aug_path = "./data/augment_leedsbutterfly/test/metadata,json"
 
     # Epoch information
     iterations = 1000 * gradient_acc_step
@@ -56,14 +58,12 @@ def config():
 
 
 @ex.capture
-def make_dataloader(path, batch_size):
-    train_dataset = AugButterFly(metadata_path=path, group='train', is_debugging=False)
-
-    val_trans_dataset = AugButterFly(metadata_path=path, group='test', is_debugging=False)
+def make_dataloader(path, train_aug_path, test_aug_path, batch_size):
+    train_dataset = CachedAugButterfly(metadata_path=train_aug_path)
+    val_trans_dataset = CachedAugButterfly(metadata_path=test_aug_path)
     val_original_dataset = ButterFly(metadata_path=path, group='test')
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-
     val_trans_loader = DataLoader(
         val_trans_dataset, batch_size=batch_size, shuffle=True, drop_last=True
     )
@@ -110,8 +110,7 @@ def train(
     logdir,
     device,
     iterations,
-    resume_iteration,
-    checkpoint_interval,
+    resume_iteration,  # checkpoint_interval,
     clip_gradient_norm,
     validation_interval,
     gradient_acc_step

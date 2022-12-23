@@ -35,6 +35,7 @@ class AugButterFly(Dataset):
         self.data = self.load_all()
         self.transform = A.Compose(
             [
+                A.SmallestMaxSize(max_size=256, always_apply=True),
                 A.GridDropout(always_apply=is_debugging),
                 A.PixelDropout(dropout_prob=0.1, p=0.25, always_apply=is_debugging),
                 A.SafeRotate(p=0.5, always_apply=is_debugging),
@@ -64,7 +65,7 @@ class AugButterFly(Dataset):
 
         return _data
 
-    def __getitem__(self, index) -> Tensor:
+    def __getitem__(self, index) -> dict:
         try:
             data = self.data[index]
             img: np.ndarray = data['image']
