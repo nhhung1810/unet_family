@@ -43,7 +43,7 @@ def config():
     path = "./metadata.json"
 
     # Epoch information
-    iterations = 100 * gradient_acc_step
+    iterations = 1000 * gradient_acc_step
     resume_iteration = None
     checkpoint_interval = None
     validation_interval = 100 * gradient_acc_step
@@ -140,7 +140,7 @@ def train(
         model = nn.DataParallel(model)
 
     # NOTE: Start train
-    loop = tqdm(range(resume_iteration + 1, iterations + 1), desc="Epoch...")
+    loop = tqdm(range(resume_iteration + 1, iterations + 1), desc="Iterations...")
     model.train()
     for i, batch in zip(loop, cycle(train_loader)):
         imag = batch['trans_image'].to(device)
