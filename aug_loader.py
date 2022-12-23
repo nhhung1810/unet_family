@@ -93,7 +93,7 @@ class AugButterFly(Dataset):
 
         except Exception as msg:
             # Choose another image
-            return self.__getitem__(index + 1)
+            return {}
 
     def __len__(self) -> int:
         return len(self.metadata)
@@ -146,10 +146,12 @@ class CachedAugButterfly(Dataset):
         Returns:
             str: _description_
         """
-        _cycling = CachedAugButterfly.cycle(dataset)
         _range = trange(int(len(dataset) * multiply_factor), desc="Caching augment data...")
         metadata = []
-        for idx, data in zip(_range, _cycling):
+        _len = len(dataset)
+        for idx in _range:
+            data = dataset[idx % _len]
+            if len(data.keys()) == 0: continue
             path = os.path.join(cache_dir, f"cached-{idx}.pt")
             torch.save(data, path)
             metadata.append(path)
