@@ -151,7 +151,8 @@ class CachedAugButterfly(Dataset):
         _len = len(dataset)
         for idx in _range:
             data = dataset[idx % _len]
-            if len(data.keys()) == 0: continue
+            if len(data.keys()) == 0:
+                continue
             path = os.path.join(cache_dir, f"cached-{idx}.pt")
             torch.save(data, path)
             metadata.append(path)
@@ -175,7 +176,7 @@ if __name__ == "__main__":
     # paths = list(make_data_path(image_dir, seg_dir))
     # dataset = AugButterFly('metadata.json', group='test', is_debugging=False)
     # CachedAugButterfly.build_cache(dataset, 0.1)
-    build_augment(group='train', factor=5)
+    build_augment(group='train', factor=0.1)
     build_augment(group='test', factor=1)
 
     # dataset = CachedAugButterfly(cached_metadata_path="./data/augment_leedsbutterfly/metadata.json")

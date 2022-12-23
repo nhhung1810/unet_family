@@ -42,10 +42,10 @@ def config():
     gradient_acc_step = 4
     path = "./metadata.json"
     train_aug_path = "./data/augment_leedsbutterfly/train/metadata.json"
-    test_aug_path = "./data/augment_leedsbutterfly/test/metadata,json"
+    test_aug_path = "./data/augment_leedsbutterfly/test/metadata.json"
 
     # Epoch information
-    iterations = 1000 * gradient_acc_step
+    iterations = 2000 * gradient_acc_step
     resume_iteration = None
     checkpoint_interval = None
     validation_interval = 100 * gradient_acc_step
@@ -59,8 +59,8 @@ def config():
 
 @ex.capture
 def make_dataloader(path, train_aug_path, test_aug_path, batch_size):
-    train_dataset = CachedAugButterfly(metadata_path=train_aug_path)
-    val_trans_dataset = CachedAugButterfly(metadata_path=test_aug_path)
+    train_dataset = CachedAugButterfly(train_aug_path)
+    val_trans_dataset = CachedAugButterfly(test_aug_path)
     val_original_dataset = ButterFly(metadata_path=path, group='test')
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
