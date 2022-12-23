@@ -2,7 +2,7 @@ import fnmatch
 import json
 import os
 from typing import List, Tuple
-
+import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -61,15 +61,18 @@ def show(imgs):
         axs[0, i].imshow(np.asarray(img))
         axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
 
-    plt.show()
-
 
 class ButterFly(Dataset):
 
-    def __init__(self, metadata_path: str, group: str = 'train') -> None:
+    def __init__(
+        self,
+        metadata_path: str,
+        group: str = 'train',
+    ) -> None:
         super().__init__()
         self.metadata_path = metadata_path
         self.group = group
+
         with open(self.metadata_path, 'r') as out:
             self.metadata = json.load(out)
 
@@ -79,9 +82,7 @@ class ButterFly(Dataset):
     def load_all(self) -> list:
         _data = []
         for _, (image_path, mask_path) in tqdm(
-            enumerate(self.metadata),
-            desc="Loading all data...",
-            total=len(self.metadata)
+            enumerate(self.metadata), desc="Loading all data...", total=len(self.metadata)
         ):
             imag = read_image(image_path)
             mask = read_image(mask_path)
@@ -105,15 +106,9 @@ if __name__ == "__main__":
     image_dir = "./data/leedsbutterfly/images"
     seg_dir = "./data/leedsbutterfly/segmentations"
     paths = list(make_data_path(image_dir, seg_dir))
-    dataset = ButterFly('metadata.json')
+    dataset = ButterFly('metadata.json', group='test')
     for data in dataset:
-        show(
-            [
-                draw_segmentation_masks(
-                    data['image'], masks=data['mask'] > 0., alpha=0.7
-                )
-            ]
-        )
+        show([draw_segmentation_masks(data['image'], masks=data['mask'] > 0., alpha=0.7)])
         break
 
     pass
