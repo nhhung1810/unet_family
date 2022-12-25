@@ -38,8 +38,11 @@ class AugButterFly(Dataset):
                 A.SmallestMaxSize(max_size=256, always_apply=True),
                 A.GridDropout(always_apply=is_debugging),
                 A.PixelDropout(dropout_prob=0.1, p=0.25, always_apply=is_debugging),
-                A.SafeRotate(p=0.5, always_apply=is_debugging),
-                A.HorizontalFlip(p=0.5, always_apply=is_debugging),
+                A.SafeRotate(
+                    p=0.5,
+                    always_apply=is_debugging,
+                    border_mode=cv2.BORDER_CONSTANT, 
+                    value=0.0),
                 # A.RandomCrop(width=256, height=256, p=0.5, always_apply=is_debugging),
                 A.ElasticTransform(always_apply=is_debugging, p=0.25),
                 A.Resize(height=256, width=256, always_apply=True)
@@ -87,8 +90,9 @@ class AugButterFly(Dataset):
 
             return {
                 "trans_image": transformed_image,
-                "trans_mask": transformed_mask,  # "image":image,
-                # "mask":mask,
+                "trans_mask": transformed_mask,
+                "image": Tensor(img).permute(2, 0, 1).float(),
+                "mask": Tensor(mask).permute(2, 0, 1).float(),
             }
 
         except Exception as msg:
@@ -171,17 +175,20 @@ def build_augment(group: str, factor: float):
 
 
 if __name__ == "__main__":
+    build_augment(group='train', factor=10)
+    build_augment(group='test', factor=1)
+
     # image_dir = "./data/leedsbutterfly/images"
     # seg_dir = "./data/leedsbutterfly/segmentations"
     # paths = list(make_data_path(image_dir, seg_dir))
-    # dataset = AugButterFly('metadata.json', group='test', is_debugging=False)
+    # dataset = AugButterFly('metadata.json', group='test', is_debugging=True)
     # CachedAugButterfly.build_cache(dataset, 0.1)
-    build_augment(group='train', factor=0.1)
-    build_augment(group='test', factor=1)
 
     # dataset = CachedAugButterfly(cached_metadata_path="./data/augment_leedsbutterfly/metadata.json")
     # data = dataset[5]
     # _to_show = [
+    #     Tensor(data['image']).type(torch.uint8),
+    #     Tensor(data['mask']).type(torch.uint8),
     #     Tensor(data['trans_image'] * 255).type(torch.uint8),
     #     draw_segmentation_masks(
     #         Tensor(data['trans_image'] * 255).type(torch.uint8),
